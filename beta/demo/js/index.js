@@ -70,6 +70,16 @@ var TrNgGridDemo;
             $scope.myEnableSorting = true;
             $scope.myEnableSelections = true;
             $scope.myEnableMultiRowSelections = true;
+            $scope.alert = function (message) {
+                $window.alert(message);
+            };
+            $scope.alertOnSelectionChange = function () {
+                $scope.$watch("mySelectedItems.length", function (newLength) {
+                    if (newLength > 0) {
+                        $window.alert("The selection now contains " + newLength + " items");
+                    }
+                });
+            };
 
             /*$scope.toogleFieldEnforcement = (fieldName: string) => {
             var fieldIndex = $scope.myFields.indexOf(fieldName);
@@ -208,6 +218,7 @@ var TrNgGridDemo;
             $scope.isFrame = $location.absUrl().indexOf("isFrame=true") >= 0;
             $scope.ui = {
                 theme: "slate",
+                themeVersion: "3.0.3",
                 themeUrl: "",
                 isMenuExpanded: false
             };
@@ -218,13 +229,26 @@ var TrNgGridDemo;
                 _this.setupThemeUrl();
                 $scope.ui.isMenuExpanded = false;
             };
+            $scope.setThemeVersion = function (themeVersion) {
+                $scope.ui.themeVersion = themeVersion || $scope.ui.themeVersion;
+                _this.setupThemeUrl();
+                $scope.ui.isMenuExpanded = false;
+            };
+            $scope.$watch("ui.themeVersion", function () {
+                $scope.setThemeVersion();
+            });
         }
         /*setupLocaleUrl() {
         var localeUrl = "https://code.angularjs.org/1.2.9/i18n/angular-locale_" + this.$scope.locale + ".js";
         this.$scope.localeUrl = this.$sce.trustAsResourceUrl(localeUrl);
         }*/
         MainController.prototype.setupThemeUrl = function () {
-            var themeUrl = "//netdna.bootstrapcdn.com/bootswatch/3.0.3/" + this.$scope.ui.theme + "/bootstrap.min.css";
+            var themeUrl;
+            if (this.$scope.ui.themeVersion == "latest") {
+                themeUrl = "//bootswatch.com/" + this.$scope.ui.theme + "/bootstrap.css";
+            } else {
+                themeUrl = "//netdna.bootstrapcdn.com/bootswatch/" + this.$scope.ui.themeVersion + "/" + this.$scope.ui.theme + "/bootstrap.min.css";
+            }
             this.$scope.ui.themeUrl = this.$sce.trustAsResourceUrl(themeUrl);
         };
         return MainController;
@@ -240,7 +264,7 @@ var TrNgGridDemo;
             //    .hashPrefix('!');
             $routeProvider.when('/Common', {
                 templateUrl: 'demo/html/common.html'
-            }).when('/ColumnPicker', {
+            }).when('/Columns', {
                 templateUrl: 'demo/html/columns.html'
             }).when('/Paging', {
                 templateUrl: 'demo/html/paging.html'
@@ -260,8 +284,6 @@ var TrNgGridDemo;
                 templateUrl: 'demo/html/tests/test_items_update.html'
             }).when('/TestHybridMode', {
                 templateUrl: 'demo/html/tests/test_hybrid_mode.html'
-            }).when('/TestFieldsCustomColumns', {
-                templateUrl: 'demo/html/tests/test_custom_columns_fields.html'
             }).when('/TestFixedHeaderFooter', {
                 templateUrl: 'demo/html/tests/test_fixed_header_footer.html'
             }).when('/TemplatePager', {

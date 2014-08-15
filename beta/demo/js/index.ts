@@ -29,6 +29,8 @@ module TrNgGridDemo{
 
         requestedItemsGridOptions: Object;
 
+        alert: (message: string) => void;
+        alertOnSelectionChange: () => void;
         addNew: () => void;
         onServerSideItemsRequested: (currentPage: number, filterBy: string, filterByFields: Object, orderBy: string, orderByReverse: boolean) => void;
         generateItems: (pageItems: number, totalItems?: number, generateComplexItems?:boolean) => void;
@@ -102,6 +104,16 @@ module TrNgGridDemo{
             $scope.myEnableSorting = true;
             $scope.myEnableSelections = true;
             $scope.myEnableMultiRowSelections = true;
+            $scope.alert = (message) => {
+                $window.alert(message);
+            };
+            $scope.alertOnSelectionChange = function(){
+                $scope.$watch("mySelectedItems.length", function(newLength: number){
+                    if (newLength > 0) {
+                        $window.alert("The selection now contains " + newLength + " items");
+                    }
+                });
+            };
             /*$scope.toogleFieldEnforcement = (fieldName: string) => {
                 var fieldIndex = $scope.myFields.indexOf(fieldName);
                 if (fieldIndex < 0) {
@@ -234,11 +246,13 @@ module TrNgGridDemo{
     export interface IMainControllerScope extends ng.IScope {
         ui: {
             theme: string;
+            themeVersion;
             themeUrl: string;
             isMenuExpanded: boolean;
         };
         isFrame: boolean;
         setTheme(theme:string);
+        setThemeVersion(themeVersion?: string);
     }
 
     export class MainController {
@@ -246,6 +260,7 @@ module TrNgGridDemo{
             $scope.isFrame = $location.absUrl().indexOf("isFrame=true") >= 0;
             $scope.ui = {
                 theme: "slate",
+                themeVersion: "3.0.3",
                 themeUrl: "",
                 isMenuExpanded: false
             };
@@ -256,6 +271,14 @@ module TrNgGridDemo{
                 this.setupThemeUrl();
                 $scope.ui.isMenuExpanded = false;
             };
+            $scope.setThemeVersion = (themeVersion?: string) => {
+                $scope.ui.themeVersion = themeVersion || $scope.ui.themeVersion;
+                this.setupThemeUrl();
+                $scope.ui.isMenuExpanded = false;
+            };
+            $scope.$watch("ui.themeVersion", () => {
+                $scope.setThemeVersion();
+            });
         }
 
         /*setupLocaleUrl() {
@@ -264,7 +287,13 @@ module TrNgGridDemo{
         }*/
 
         setupThemeUrl() {
-            var themeUrl = "//netdna.bootstrapcdn.com/bootswatch/3.0.3/"+this.$scope.ui.theme+"/bootstrap.min.css";
+            var themeUrl;
+            if (this.$scope.ui.themeVersion == "latest") {
+                themeUrl = "//bootswatch.com/" + this.$scope.ui.theme + "/bootstrap.css";
+            }
+            else {
+                themeUrl = "//netdna.bootstrapcdn.com/bootswatch/" + this.$scope.ui.themeVersion + "/" + this.$scope.ui.theme + "/bootstrap.min.css";
+            }
             this.$scope.ui.themeUrl = this.$sce.trustAsResourceUrl(themeUrl);
         }
     }
@@ -281,7 +310,7 @@ module TrNgGridDemo{
                 .when('/Common', {
                     templateUrl: 'demo/html/common.html'
                 })
-                .when('/ColumnPicker', {
+                .when('/Columns', {
                     templateUrl: 'demo/html/columns.html'
                 })
                 .when('/Paging', {
@@ -310,9 +339,6 @@ module TrNgGridDemo{
                 })
                 .when('/TestHybridMode', {
                     templateUrl: 'demo/html/tests/test_hybrid_mode.html'
-                })
-                .when('/TestFieldsCustomColumns', {
-                    templateUrl: 'demo/html/tests/test_custom_columns_fields.html'
                 })
                 .when('/TestFixedHeaderFooter', {
                     templateUrl: 'demo/html/tests/test_fixed_header_footer.html'

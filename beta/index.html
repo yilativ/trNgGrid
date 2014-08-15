@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=Edge">
     <title>trNgGrid</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" ng-href="{{ui.themeUrl}}" />
+    <link rel="stylesheet" ng-href="{{ui.themeUrl}}" media="screen" />
     <link rel="stylesheet" href="demo/css/index.css" />
     <link href="//google-code-prettify.googlecode.com/svn/loader/prettify.css" type="text/css" rel="stylesheet" />
     <!--<link href="//google-code-prettify.googlecode.com/svn/loader/skins/sons-of-obsidian.css" type="text/css" rel="stylesheet" />-->
@@ -53,7 +53,7 @@
         <div class="collapse navbar-collapse" ng-class="!navCollapsed && 'in'" ng-click="navCollapsed=true">
             <ul class="nav navbar-nav">
                 <li><a href="#/Common">Plug & Play</a></li>
-                <li><a href="#/ColumnPicker">Column Definition</a></li>
+                <li><a href="#/Columns">Column Definition</a></li>
                 <li><a href="#/Paging">Paging</a></li>
                 <li><a href="#/Selections">Selections</a></li>
                 <li><a href="#/GlobalOptions">Grid Options</a></li>
@@ -66,7 +66,6 @@
                         <li><a href="#/TestNgSwitch">Case #9 (ng-switch)</a></li>
                         <li><a href="#/TestItemsUpdate">Case #6 (replacing the 'items' array) </a></li>
                         <li><a href="#/TestHybridMode">Case #28 (hybrid mode) </a></li>
-                        <li><a href="#/TestFieldsCustomColumns">Case #38 (extra custom columns) </a></li>
                         <!--<li><a href="#/Benchmark">Benchmarks </a></li>-->
                         <!--<li><a href="#/TestFixedHeaderFooter">Case #22 (fixed header and footer) </a></li>   -->
                     </ul>
@@ -78,6 +77,8 @@
                     <!--onclick="$(this).toggleClass('open'); return false;"-->
                     <a class="dropdown-toggle" href="">Bootswatch theme <b class="caret"></b></a>
                     <ul class="dropdown-menu" role="menu">
+                        <li><a hhref=""><select class="form-control" ng-model="ui.themeVersion" ng-options="version for version in ['3.0.3','latest']"></select></a></li>
+                        <li class="divider"></li>
                         <li><a href="" ng-click="setTheme('amelia')">Amelia</a></li>
                         <li><a href="" ng-click="setTheme('cerulean')">Cerulean</a></li>
                         <li><a href="" ng-click="setTheme('cosmo')">Cosmo</a></li>
@@ -90,6 +91,8 @@
                         <li><a href="" ng-click="setTheme('spacelab')">Spacelab</a></li>
                         <li><a href="" ng-click="setTheme('united')">United</a></li>
                         <li><a href="" ng-click="setTheme('yeti')">Yeti</a></li>
+                        <li ng-if="ui.themeVersion!='3.0.3'"><a href="" ng-click="setTheme('superhero')">Superhero</a></li>
+                        <li ng-if="ui.themeVersion!='3.0.3'"><a href="" ng-click="setTheme('lumen')">Lumen</a></li>
                         <li class="divider"></li>
                         <li><a href="//bootswatch.com/" target="_blank">Bootswatch Home Page</a></li>
                     </ul>

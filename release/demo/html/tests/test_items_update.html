@@ -1,7 +1,7 @@
-﻿<div ng-controller="TrNgGridDemo.TestController" ng-init="generateItems(20)">
+﻿<div ng-controller="TrNgGridDemo.TestController">
     <div class="panel panel-primary">
         <div class="panel-heading">
-            ng-switch
+            Monitoring the items array
         </div>
         <div class="panel-body">
             <div class="row">
@@ -19,10 +19,15 @@
 <p>
     <button type="button" class="btn btn-default" ng-click="generateItems(20)">
         Generate Items
-    </button>&nbsp;
+    </button>
     Page: <input type="number" min="0" max="3" ng-model="myItemsCurrentPageIndex"></input>
 </p>
-<table tr-ng-grid items="myItems" page-items="5" current-page="myItemsCurrentPageIndex"></table>
+<table 
+        tr-ng-grid 
+        items="myItems" 
+        page-items="5" 
+        current-page="myItemsCurrentPageIndex">
+</table>
                 </div>
             </div>
         </div>

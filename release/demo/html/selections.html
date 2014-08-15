@@ -42,7 +42,6 @@
                 <div class=" col-md-4">
                     <pre id="trNgGrid_Selection_Types">
                     </pre>
-                    <p class="text-danger">The <em>enable-selections</em> and the <em>enable-multi-row-selections</em> attributes are deprecated and will be removed in a future version.</p>
                     <div>
                         <div class="well">
                             Selection mode: <select ng-model="mySelectionMode" ng-options="modeName for modeName in ['None', 'SingleRow', 'MultiRow', 'MultiRowWithKeyModifiers']"></select>
@@ -64,7 +63,7 @@ $scope.watch("mySelectedItems.length", function(newLength){
                 <div class="col-md-8">
                     <table tr-ng-grid page-items="10" items="myItems" selected-items="mySelectedItems" selection-mode="{{mySelectionMode}}"></table>
                     <div ng-show="false" project-markup-to="#trNgGrid_Selection_Types">
-                        <table tr-ng-grid items="myItems" selected-items="mySelectedItems" selection-mode="None|SingleRow|MultiRow|MultiRowWithKeyModifiers"></table>
+<table tr-ng-grid items="myItems" selected-items="mySelectedItems" selection-mode="None|SingleRow|MultiRow|MultiRowWithKeyModifiers"></table>
                     </div>
                 </div>
             </div>
@@ -91,10 +90,10 @@ $scope.watch("mySelectedItems.length", function(newLength){
                             </pre>
             <div ng-controller="TrNgGridDemo.TestController" class="row" ng-init="generateItems(10)">
                 <div class="col-md-6" project-markup-to="#trNgGrid_Sample_Selection_1">
-                    <table tr-ng-grid items="myItems" selected-items="mySelectedItems" selection-mode="MultiRow"></table>
+<table tr-ng-grid items="myItems" selected-items="mySelectedItems" selection-mode="MultiRow"></table>
                 </div>
                 <div class="col-md-6" project-markup-to="#trNgGrid_Sample_Selection_2">
-                    <table tr-ng-grid items="mySelectedItems" selection-mode="None"></table>
+<table tr-ng-grid items="mySelectedItems" selection-mode="None"></table>
                 </div>
             </div>
         </div>
