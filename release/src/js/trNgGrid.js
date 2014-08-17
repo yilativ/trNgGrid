@@ -166,16 +166,15 @@ var TrNgGrid;
     ////        templateElement.append(angular.element("<div></div>").attr(cellTemplateDirective, ""));
     ////    }
     ////}
-    var TemplatedCell = (function () {
-        function TemplatedCell(cellElement) {
-            this.cellElement = cellElement;
-            this.fieldName = cellElement.attr(fieldNameAttribute);
-            var customContent = cellElement.children();
-            this.isStandardColumn = customContent.length === 0;
-        }
-        return TemplatedCell;
-    })();
-
+    ////class TemplatedCell implements IGridColumn {
+    ////    public fieldName: string;
+    ////    public isStandardColumn: boolean;
+    ////    constructor(public cellElement: JQuery) {
+    ////        this.fieldName = cellElement.attr(fieldNameAttribute);
+    ////        var customContent = cellElement.children();
+    ////        this.isStandardColumn = customContent.length === 0;
+    ////    }
+    ////}
     ////class TemplatedSection {
     ////    public cells: Array<TemplatedCell>;
     ////    constructor(
@@ -281,11 +280,8 @@ var TrNgGrid;
                 templatesConfigured = true;
             }
         }
-        GridController.prototype.setupScope = function ($isolatedScope, $gridElement, $attrs) {
+        GridController.prototype.setupScope = function ($isolatedScope, gridScope, $attrs) {
             var _this = this;
-            // create a scope, used just by our grid
-            var gridScope = angular.element($gridElement).scope().$new();
-
             // initialise the options
             this.gridOptions = {
                 immediateDataRetrieval: true,
@@ -613,7 +609,7 @@ var TrNgGrid;
             } else {
                 scope.requiresReFilteringTrigger = !scope.requiresReFilteringTrigger;
             }
-            var gridColumnDefs = scope.gridOptions.gridColumnDefs;
+            var gridColumnDefs = this.gridOptions.gridColumnDefs;
             for (var inputIndex = 0; inputIndex < input.length; inputIndex++) {
                 var inputItem = input[inputIndex];
                 var outputItem;
@@ -670,14 +666,13 @@ var TrNgGrid;
                 }
             }
             TrNgGrid.debugMode && log("filtering items of length " + (scope.formattedItems ? scope.formattedItems.length : 0));
-            debugger;
             scope.filteredItems = scope.$eval("formattedItems | filter:gridOptions.filterBy | filter:filterByDisplayFields | orderBy:'$$_gridItem.'+gridOptions.orderBy:gridOptions.orderByReverse | " + TrNgGrid.dataPagingFilter + ":gridOptions");
         };
 
         GridController.prototype.setupDisplayItemsArray = function (scope) {
             var _this = this;
             var watchExpression = "[gridOptions.items,gridOptions.gridColumnDefs.length";
-            angular.forEach(scope.gridOptions.gridColumnDefs, function (gridColumnDef) {
+            angular.forEach(this.gridOptions.gridColumnDefs, function (gridColumnDef) {
                 if (gridColumnDef.displayFormat && gridColumnDef.displayFormat[0] != '.') {
                     // watch the parameters
                     var displayfilters = gridColumnDef.displayFormat.split('|');
@@ -800,7 +795,7 @@ var TrNgGrid;
         console.log(tableDirective + "(" + new Date().getTime() + "): " + message);
     };
 
-    var fixTableStructure = function (gridElement) {
+    var fixTableStructure = function (gridElement, allowDataBindings) {
         gridElement.addClass(TrNgGrid.tableCssClass);
 
         // make sure the header is present
@@ -834,9 +829,22 @@ var TrNgGrid;
                 TrNgGrid.debugMode && log("Invalid extra element found inside the grid template structure: " + element.tagName);
             }
         });
+
+        // block or allow data bindings
+        if (allowDataBindings) {
+            tableHeaderElement.removeAttr("data-ng-non-bindable");
+            tableFooterElement.removeAttr("data-ng-non-bindable");
+            tableBodyElement.removeAttr("data-ng-non-bindable");
+        } else {
+            tableHeaderElement.attr("data-ng-non-bindable", "");
+            tableFooterElement.attr("data-ng-non-bindable", "");
+            tableBodyElement.attr("data-ng-non-bindable", "");
+        }
     };
 
-    angular.module("trNgGrid", []).directive(tableDirective, [function () {
+    angular.module("trNgGrid", []).directive(tableDirective, [
+        "$compile",
+        function ($compile) {
             return {
                 restrict: 'A',
                 scope: {
@@ -857,7 +865,6 @@ var TrNgGrid;
                     onDataRequiredDelay: '=?',
                     fields: '=?'
                 },
-                transclude: true,
                 template: function (templateElement, tAttrs) {
                     //templateElement.addClass(tableCssClass);
                     ////// at this stage, no elements can be bound
@@ -865,27 +872,40 @@ var TrNgGrid;
                     ////    childElement = angular.element(childElement);
                     ////    childElement.attr("ng-non-bindable", "");
                     ////});
-                    // fix a couple of attributes in order to remain in control
-                    fixTableStructure(angular.element(templateElement));
                 },
                 controller: ["$compile", "$parse", "$timeout", "$templateCache", GridController],
                 compile: function (templateElement, tAttrs) {
-                    return {
-                        pre: function (isolatedScope, instanceElement, tAttrs, controller, transcludeFn) {
-                            debugger;
-                            var gridScope = controller.setupScope(isolatedScope, instanceElement, tAttrs);
-                            gridScope["gridScopeMarker"] = true;
-                            gridScope.speedUpAsyncDataRetrieval = function ($event) {
-                                return controller.speedUpAsyncDataRetrieval($event);
-                            };
-                            gridScope.gridOptions.gridColumnDefs = [{ fieldName: "Id", isStandardColumn: true }];
+                    // fix a couple of attributes in order to remain in control
+                    // block data bindings as well at this stage
+                    fixTableStructure(angular.element(templateElement), false);
 
-                            //controller.configureTableStructure(gridScope, instanceElement);
-                            controller.setupDisplayItemsArray(gridScope);
-                        },
-                        post: function (isolatedScope, instanceElement, tAttrs, controller, transcludeFn) {
-                            debugger;
-                        }
+                    return function (isolatedScope, instanceElement, tAttrs, controller, transcludeFn) {
+                        // we want to grab the settings, but we don't want to live in an isolated scope from this point onwards
+                        // the original table temnplate may contain a combination of both grid settings, outer bindings and templates which are linked to inner functionality
+                        // a transcluded scope wouldn't work either, since that will put us straight outside
+                        // hence we need to escape from the isolated scope or transclusions, and create a child scope of our own
+                        // create our own child scope
+                        var gridScope = isolatedScope.$parent.$new();
+
+                        // grab all the settings and dual link them
+                        controller.setupScope(isolatedScope, gridScope, tAttrs);
+                        gridScope.speedUpAsyncDataRetrieval = function ($event) {
+                            return controller.speedUpAsyncDataRetrieval($event);
+                        };
+                        gridScope.gridOptions.gridColumnDefs = [{ fieldName: "Id", isStandardColumn: true }];
+
+                        //controller.configureTableStructure(gridScope, instanceElement);
+                        controller.setupDisplayItemsArray(gridScope);
+
+                        // fix the grid again but this time allow the data bindings
+                        fixTableStructure(instanceElement, true);
+
+                        // recompile the table elements (THEAD, TFOOT, TBODY)
+                        angular.forEach(instanceElement.children(), function (gridElement) {
+                            var angularGridElement = angular.element(gridElement);
+                            var angularCompiledGridElement = $compile(angular.element(gridElement))(gridScope);
+                            angularGridElement.replaceWith(angularCompiledGridElement);
+                        });
                     };
                 }
             };
@@ -896,13 +916,9 @@ var TrNgGrid;
                 require: '^' + tableDirective,
                 template: '<tr ng-repeat="gridDisplayItem in filteredItems"><td>Test</td></tr>',
                 compile: function (templateElement, templateAttributes) {
-                    return {
-                        pre: function (scope, instanceElement, tAttrs, controller, transcludeFn) {
-                            debugger;
-                        },
-                        post: function (scope, instanceElement, tAttrs, controller, transcludeFn) {
-                            debugger;
-                        }
+                    debugger;
+                    return function (gridScope, instanceElement, tAttrs, controller, transcludeFn) {
+                        debugger;
                     };
                 }
             };
