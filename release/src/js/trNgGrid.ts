@@ -9,7 +9,7 @@ module TrNgGrid{
     }
 
     export declare var defaultPagerMinifiedPageCountThreshold: number;
-    export declare var defaultColumnOptions: IBasicGridColumnOptions;
+    export declare var defaultColumnOptions: IGridColumnOptions;
     export declare var translations: { [language: string]: { [textId: string]: string } };
     export declare var translationDateFormat: string;
 
@@ -123,9 +123,12 @@ module TrNgGrid{
 
     export interface IGridColumn {
         fieldName?: string;
+        isAllowed?: boolean;
+        displayFieldName?: string;
+        isCustomized?: boolean;
     }
 
-    export interface IBasicGridColumnOptions {
+    export interface IGridColumnOptions {
         displayName?: string;
         displayAlign?: string;
         displayFormat?: string;
@@ -136,8 +139,7 @@ module TrNgGrid{
         filter?: string;
     }
 
-    export interface IGridColumnOptions extends IGridColumn, IBasicGridColumnOptions{
-        displayFieldName?: string;
+    export interface IGridColumnDefinition extends IGridColumnOptions, IGridColumn {
     }
 
     interface IGridDisplayItem {
@@ -162,7 +164,7 @@ module TrNgGrid{
         onDataRequiredDelay: number;
         locale: string;
         immediateDataRetrieval: boolean;
-        gridColumnDefs: Array<IGridColumnOptions>;
+        gridColumnDefs: Array<IGridColumnDefinition>;
     }
 
     interface IGridScope extends ng.IScope{
@@ -177,8 +179,7 @@ module TrNgGrid{
     }
 
     interface IGridColumnScope extends IGridScope{
-        columnOptions: IGridColumnOptions;
-        isCustomized?: boolean;
+        columnOptions: IGridColumnDefinition;
     }
 
     interface IGridHeaderColumnScope extends IGridColumnScope {
@@ -191,8 +192,6 @@ module TrNgGrid{
     }
 
     interface IGridBodyColumnScope extends IGridColumnScope{
-        isCustomized?: boolean;
-        columnDefinitionIndex: number;
         gridItem:any;
         gridDisplayItem: IGridDisplayItem;
     }
@@ -438,9 +437,9 @@ module TrNgGrid{
         //private templatedBody: TemplatedSection;
         //private templatedFooter: TemplatedSection;
         //private gridElement:ng.IAugmentedJQuery;
-        private columnDefsItemsWatcherDeregistration:Function;
-        private columnDefsFieldsWatcherDeregistration: Function;
+        private columnDefsFieldsWatcherDeregistrationFct: Function;
         private dataRequestPromise: ng.IPromise<any>;
+        private itemColumnDefWatcherDeregFct: Function;
 
         constructor(
             private $compile: ng.ICompileService,
@@ -484,8 +483,20 @@ module TrNgGrid{
             gridScope.TrNgGrid = TrNgGrid;
             this.linkScope(gridScope, $isolatedScope, "gridOptions", $attrs);
 
-            //set up watchers for some of the special attributes we support
+            // set up watchers for auto field definitions extraction
+            this.columnDefsFieldsWatcherDeregistrationFct = gridScope.$watch("gridOptions.items.length", (newItemsLength: number) => {
+                if (newItemsLength) {
+                    // extract the field names
+                    for (var propName in this.gridOptions.items[0]) {
+                        // exclude the library properties
+                        if (!propName.match(/^[_\$]/g)) {
+                            this.setupColumn(propName, false, false);
+                        }
+                    }
+                }
+            });
 
+            //set up watchers for some of the special attributes we support
             if (this.gridOptions.onDataRequired) {
                 var retrieveDataCallback = () => {
                     this.dataRequestPromise = null;
@@ -548,18 +559,18 @@ module TrNgGrid{
             }
         }
 
-        setColumnOptions(columnIndex: number, columnOptions: IGridColumnOptions): void {
-            var originalOptions = this.gridOptions.gridColumnDefs[columnIndex];
-            if (!originalOptions) {
-                throw "Invalid grid column options found for column index " + columnIndex + ". Please report this error."
-            }
+        ////setColumnOptions(columnIndex: number, columnOptions: IGridColumnOptions): void {
+        ////    var originalOptions = this.gridOptions.gridColumnDefs[columnIndex];
+        ////    if (!originalOptions) {
+        ////        throw "Invalid grid column options found for column index " + columnIndex + ". Please report this error."
+        ////    }
 
-            // copy a couple of options onto the incoming set of options
-            columnOptions = angular.extend(columnOptions, originalOptions);
+        ////    // copy a couple of options onto the incoming set of options
+        ////    columnOptions = angular.extend(columnOptions, originalOptions);
 
-            // replace the original options 
-            this.gridOptions.gridColumnDefs[columnIndex] = columnOptions;            
-        }
+        ////    // replace the original options 
+        ////    this.gridOptions.gridColumnDefs[columnIndex] = columnOptions;            
+        ////}
 
         toggleSorting(propertyName: string) {
             if(this.gridOptions.orderBy!=propertyName){
@@ -588,6 +599,53 @@ module TrNgGrid{
 
             // in order for someone to successfully listen to changes made to this object, we need to replace it
             this.gridOptions.filterByFields = angular.extend({}, this.gridOptions.filterByFields);
+        }
+
+        setupColumn(gridColumn:IGridColumn, gridOptions?: IGridColumnOptions) {
+            if (!this.gridOptions.gridColumnDefs) {
+                this.gridOptions.gridColumnDefs = [];
+            }
+
+            // deregister any watcher set on the object items for the purpose of finding fields
+            if (this.columnDefsFieldsWatcherDeregistrationFct) {
+                this.columnDefsFieldsWatcherDeregistrationFct();
+                this.columnDefsFieldsWatcherDeregistrationFct = null;
+            }
+
+            // find the column definition first
+            var columnDefOptions: IGridColumnOptions;
+            var columnDefIndex: number;
+            for (columnDefIndex = 0; columnDefIndex < this.gridOptions.gridColumnDefs.length && this.gridOptions.gridColumnDefs[columnDefIndex].fieldName !== fieldName; columnDefIndex++);
+            if (columnDefIndex >= this.gridOptions.gridColumnDefs.length) {
+                // it's new, add it
+                columnDefOptions = {
+                    isAllowed: true,
+                    fieldName: fieldName,
+                    isCustomized: isCustomized,
+                    isTemplated: isTemplated,
+                    displayFieldName: fieldName? this.getFormattedFieldName(fieldName): null
+                };
+                this.gridOptions.gridColumnDefs.push(columnDefOptions);
+            }
+
+            if (isolatedFieldScope) {
+                angular.extend(columnDefOptions, isolatedFieldScope);
+            }
+        }
+
+        findColumnOptionsByFieldName(fieldName: string): IBasicGridColumnOptions {
+            if (!this.gridOptions.gridColumnDefs) {
+                // not yet known
+                return null;
+            }
+
+            var columnDefIndex: number;
+            for (columnDefIndex = 0; columnDefIndex < this.gridOptions.gridColumnDefs.length && this.gridOptions.gridColumnDefs[columnDefIndex].fieldName !== fieldName; columnDefIndex++);
+            if (columnDefIndex < this.gridOptions.gridColumnDefs.length) {
+                return this.gridOptions.gridColumnDefs[columnDefIndex];
+            }
+
+            return null;
         }
 
         toggleItemSelection(filteredItems: Array<IGridDisplayItem>, item: any, $event: ng.IAngularEvent) {
@@ -1055,8 +1113,8 @@ module TrNgGrid{
     }
 
     angular.module("trNgGrid", [])
-        .directive(tableDirective, [ "$compile",
-            ($compile:ng.ICompileService) => {
+        .directive(tableDirective, ["$compile",
+            ($compile: ng.ICompileService) => {
                 return {
                     restrict: 'A',
                     scope: {
@@ -1094,7 +1152,7 @@ module TrNgGrid{
 
                         return (isolatedScope: ng.IScope, instanceElement: ng.IAugmentedJQuery, tAttrs: ng.IAttributes, controller: GridController, transcludeFn: ng.ITranscludeFunction) => {
                             // we want to grab the settings, but we don't want to live in an isolated scope from this point onwards
-                            // the original table temnplate may contain a combination of both grid settings, outer bindings and templates which are linked to inner functionality
+                            // the original table template may contain a combination of both grid settings, outer bindings and templates which are linked to inner functionality
                             // a transcluded scope wouldn't work either, since that will put us straight outside
                             // hence we need to escape from the isolated scope or transclusions, and create a child scope of our own
 
@@ -1104,7 +1162,6 @@ module TrNgGrid{
                             // grab all the settings and dual link them
                             controller.setupScope(isolatedScope, gridScope, tAttrs);
                             gridScope.speedUpAsyncDataRetrieval = ($event) => controller.speedUpAsyncDataRetrieval($event);
-                            gridScope.gridOptions.gridColumnDefs = [<IGridColumnOptions>{ fieldName: "Id", isStandardColumn: true }];
                             //controller.configureTableStructure(gridScope, instanceElement);
                             controller.setupDisplayItemsArray(gridScope);
 
@@ -1118,25 +1175,50 @@ module TrNgGrid{
                                 angularGridElement.replaceWith(angularCompiledGridElement);
                             });
                         }
-                    } 
+                    }
                 };
             }])
-        .directive(bodyDirective, [
+        .directive(headerDirective, [
             () => {
                 return <ng.IDirective>{
                     restrict: 'A',
                     require: '^' + tableDirective,
-                    template: '<tr ng-repeat="gridDisplayItem in filteredItems"><td>Test</td></tr>',
-                    compile: (templateElement: ng.IAugmentedJQuery, templateAttributes: ng.IAttributes) => {
-                        debugger;
-                        return (gridScope: IGridScope, instanceElement: ng.IAugmentedJQuery, tAttrs: ng.IAttributes, controller: GridController, transcludeFn: ng.ITranscludeFunction) => {
-                            debugger;
-                        }
-                    }
+                    template:
+                    '<thead>' +
+                    '  <tr>' +
+                    '    <th ng-repeat="columnOptions in gridOptions.gridColumnDefs" ' + cellHeaderDirectiveAttribute + ' = "">' +
+                    '      <div ' + cellHeaderTemplateDirectiveAttribute + ' = ""></div>' +
+                    '    </th>' +
+                    '  </tr> ' +
+                    '</thead> '
                 }
             }
         ])
-        .directive(cellHeaderDirective, [
+        .directive(cellHeaderDirective, ["$compile",
+            ($compile: ng.ICompileService) => {
+                return <ng.IDirective>{
+                    restrict: 'A',
+                    scope: {
+                        displayName: '&',
+                        displayAlign: '&',
+                        displayFormat: '&',
+                        enableSorting: '&',
+                        enableFiltering: '&',
+                        cellWidth: '&',
+                        cellHeight: '&',
+                        filter: '&',
+                    },
+                    require: '^' + tableDirective,
+                    transclude: true,
+                    link: (isolatedScope: IGridHeaderColumnScope, instanceElement: ng.IAugmentedJQuery, tAttrs: ng.IAttributes, controller: GridController, transcludeFn: ng.ITranscludeFunction) => {
+                        transcludeFn(isolatedScope.$parent, (clonedElement: ng.IAugmentedJQuery, gridColumnScope: IGridHeaderColumnScope) => {
+                            instanceElement.append(clonedElement);
+                        });
+                    }
+                };
+            }
+        ])
+        .directive(cellHeaderTemplateDirective, [
             () => {
                 var setupColumnTitle = (scope: IGridHeaderColumnScope) => {
                     if (scope.columnOptions.displayName) {
@@ -1163,56 +1245,214 @@ module TrNgGrid{
                 return {
                     restrict: 'A',
                     require: '^' + tableDirective,
+                    templateUrl: cellHeaderTemplateId,
+                    replace: true,
                     scope: true,
-                    compile: (templateElement: JQuery, tAttrs: Object) => {
-                        var isCustomized = tAttrs['isCustomized'] == 'true';
-                        //wrapTemplatedCell(templateElement, tAttrs, isCustomized, cellHeaderTemplateDirectiveAttribute);
+                    //replace: true,
+                    link: (gridColumnScope: IGridHeaderColumnScope, instanceElement: ng.IAugmentedJQuery, tAttrs: ng.IAttributes, controller: GridController, transcludeFn: ng.ITranscludeFunction) => {
+                        gridColumnScope.toggleSorting = (propertyName: string) => {
+                            controller.toggleSorting(propertyName);
+                        };
 
-                        return {
-                            // we receive a reference to a real element that will appear in the DOM, after the controller was created, but before binding setup
-                            pre: (scope: IGridHeaderColumnScope, instanceElement: JQuery, tAttrs: ng.IAttributes, controller: GridController, $transclude: ng.ITranscludeFunction) => {
-                                // we're not interested in creating an isolated scope just to parse the element attributes,
-                                // so we're gonna have to do this manually
+                        // set up the column title
+                        setupColumnTitle(gridColumnScope);
 
-                                var columnIndex = parseInt(tAttrs[cellHeaderDirective]);
-
-                                // create a clone of the default column options
-                                var columnOptions: IGridColumnOptions = angular.extend(scope.gridOptions.gridColumnDefs[columnIndex], defaultColumnOptions);
-
-                                // now match and observe the attributes
-                                controller.linkAttrs(tAttrs, columnOptions);
-
-                                // set up the new scope
-                                scope.columnOptions = columnOptions;
-                                scope.isCustomized = isCustomized;
-                                scope.toggleSorting = (propertyName: string) => {
-                                    controller.toggleSorting(propertyName);
-                                };
-
-                                // set up the column title
-                                setupColumnTitle(scope);
-
-                                scope.$watch("columnOptions.filter", (newValue: string, oldValue: string) => {
-                                    if (newValue !== oldValue) {
-                                        controller.setFilter(columnOptions.fieldName, newValue);
-                                    }
-                                });
+                        // watch for changes in the column filter
+                        gridColumnScope.$watch("columnOptions.filter", (newValue: string, oldValue: string) => {
+                            if (newValue !== oldValue) {
+                                controller.setFilter(gridColumnScope.columnOptions.fieldName, newValue);
                             }
-                        }
+                        });
+
                     }
                 };
             }
         ])
-        .directive(cellHeaderTemplateDirective, [
-            () => {
+        .directive(columnSortDirective, [
+            function () {
                 return {
                     restrict: 'A',
-                    templateUrl: cellHeaderTemplateId,
-                    transclude: true,
+                    require: '^' + tableDirective,
                     replace: true,
+                    templateUrl: columnSortTemplateId
                 };
             }
         ])
+        .directive(columnFilterDirective, [
+            function () {
+                return {
+                    restrict: 'A',
+                    require: '^' + tableDirective,
+                    replace: true,
+                    templateUrl: columnFilterTemplateId
+                };
+            }
+        ])
+        .directive(bodyDirective, [
+            () => {
+                return <ng.IDirective>{
+                    restrict: 'A',
+                    require: '^' + tableDirective,
+                    template:
+                    '<tbody>' +
+                    '  <tr ng-repeat="gridDisplayItem in filteredItems" ng-init="gridItem=gridDisplayItem.$$_gridItem" ng-click="toggleItemSelection(gridItem, $event)" ng-class="{\'' + TrNgGrid.rowSelectedCssClass + '\':gridOptions.selectedItems.indexOf(gridItem)>=0}">' +
+                    '    <td ng-repeat="columnOptions in gridOptions.gridColumnDefs" ' + cellBodyDirectiveAttribute + ' = "">' +
+                    '      <div ' + cellBodyTemplateDirectiveAttribute + ' = ""></div>' +
+                    '    </td>' +
+                    '  </tr> ' +
+                    '</thead> ',
+                    link: (gridBodyScope: IGridBodyScope, instanceElement: ng.IAugmentedJQuery, tAttrs: ng.IAttributes, controller: GridController, transcludeFn: ng.ITranscludeFunction) => {
+                        gridBodyScope.toggleItemSelection = (item: any, $event: ng.IAngularEvent) => {
+                            controller.toggleItemSelection(gridBodyScope.filteredItems, item, $event);
+                        };
+                    }
+                }
+            }
+        ])
+        .directive(cellBodyTemplateDirective, [
+            () => {
+                return <ng.IDirective>{
+                    restrict: 'A',
+                    require: '^' + tableDirective,
+                    templateUrl: cellBodyTemplateId,
+                    replace: true,
+                    scope: true,
+                    link: (gridBodyCellScope: IGridBodyColumnScope, instanceElement: ng.IAugmentedJQuery, tAttrs: ng.IAttributes, controller: GridController, transcludeFn: ng.ITranscludeFunction) => {
+                    }
+                };
+            }
+        ])
+        .directive(footerDirective, [
+            () => {
+                return <ng.IDirective>{
+                    restrict: 'A',
+                    require: '^' + tableDirective,
+                    template:
+                    '<tfoot>' +
+                    '  <tr>' +
+                    '    <td ' + cellFooterDirectiveAttribute + ' = "" ng-attr-colspan="{{gridOptions.gridColumnDefs.length}}">' +
+                    '    </td>' +
+                    '  </tr> ' +
+                    '</tfoot> ',
+                    scope: true,
+                    link: (gridFooterScope: IGridFooterScope, instanceElement: ng.IAugmentedJQuery, tAttrs: ng.IAttributes, controller: GridController, transcludeFn: ng.ITranscludeFunction) => {
+                    }
+                };
+            }
+        ])
+        .directive(cellFooterDirective, [
+            () => {
+                return <ng.IDirective>{
+                    restrict: 'A',
+                    require: '^' + tableDirective,
+                    template: '<div ' + cellFooterTemplateDirectiveAttribute + ' = ""></div>',
+                };
+            }
+        ])
+        .directive(cellFooterTemplateDirective, [
+            () => {
+                return {
+                    restrict: 'A',
+                    require: '^' + tableDirective,
+                    templateUrl: cellFooterTemplateId,
+                    transclude: true,
+                    replace: true
+                };
+            }
+        ])
+
+        ////.directive(bodyDirective, [
+        ////    () => {
+        ////        return <ng.IDirective>{
+        ////            restrict: 'A',
+        ////            require: '^' + tableDirective,
+        ////            template: '<tr ng-repeat="gridDisplayItem in filteredItems"><td>Test</td></tr>',
+        ////            compile: (templateElement: ng.IAugmentedJQuery, templateAttributes: ng.IAttributes) => {
+        ////                debugger;
+        ////                return (gridScope: IGridScope, instanceElement: ng.IAugmentedJQuery, tAttrs: ng.IAttributes, controller: GridController, transcludeFn: ng.ITranscludeFunction) => {
+        ////                    debugger;
+        ////                }
+        ////            }
+        ////        }
+        ////    }
+        ////])
+        ////.directive(cellHeaderDirective, [
+        ////    () => {
+        ////        var setupColumnTitle = (scope: IGridHeaderColumnScope) => {
+        ////            if (scope.columnOptions.displayName) {
+        ////                scope.columnTitle = scope.columnOptions.displayName;
+        ////            }
+        ////            else {
+        ////                if (!scope.columnOptions.fieldName) {
+        ////                    scope.columnTitle = "[Invalid Field Name]";
+        ////                }
+        ////                else {
+        ////                    // exclude nested notations
+        ////                    var splitFieldName = scope.columnOptions.fieldName.match(/^[^\.\[\]]*/);
+
+        ////                    // split by camel-casing
+        ////                    splitFieldName = splitFieldName[0].split(/(?=[A-Z])/);
+        ////                    if (splitFieldName.length && splitFieldName[0].length) {
+        ////                        splitFieldName[0] = splitFieldName[0][0].toLocaleUpperCase() + splitFieldName[0].substr(1);
+        ////                    }
+        ////                    scope.columnTitle = splitFieldName.join(" ");
+        ////                }
+        ////            }
+        ////        };
+
+        ////        return {
+        ////            restrict: 'A',
+        ////            require: '^' + tableDirective,
+        ////            scope: true,
+        ////            compile: (templateElement: JQuery, tAttrs: Object) => {
+        ////                var isCustomized = tAttrs['isCustomized'] == 'true';
+        ////                //wrapTemplatedCell(templateElement, tAttrs, isCustomized, cellHeaderTemplateDirectiveAttribute);
+
+        ////                return {
+        ////                    // we receive a reference to a real element that will appear in the DOM, after the controller was created, but before binding setup
+        ////                    pre: (scope: IGridHeaderColumnScope, instanceElement: JQuery, tAttrs: ng.IAttributes, controller: GridController, $transclude: ng.ITranscludeFunction) => {
+        ////                        // we're not interested in creating an isolated scope just to parse the element attributes,
+        ////                        // so we're gonna have to do this manually
+
+        ////                        var columnIndex = parseInt(tAttrs[cellHeaderDirective]);
+
+        ////                        // create a clone of the default column options
+        ////                        var columnOptions: IGridColumnOptions = angular.extend(scope.gridOptions.gridColumnDefs[columnIndex], defaultColumnOptions);
+
+        ////                        // now match and observe the attributes
+        ////                        controller.linkAttrs(tAttrs, columnOptions);
+
+        ////                        // set up the new scope
+        ////                        scope.columnOptions = columnOptions;
+        ////                        scope.isCustomized = isCustomized;
+        ////                        scope.toggleSorting = (propertyName: string) => {
+        ////                            controller.toggleSorting(propertyName);
+        ////                        };
+
+        ////                        // set up the column title
+        ////                        setupColumnTitle(scope);
+
+        ////                        scope.$watch("columnOptions.filter", (newValue: string, oldValue: string) => {
+        ////                            if (newValue !== oldValue) {
+        ////                                controller.setFilter(columnOptions.fieldName, newValue);
+        ////                            }
+        ////                        });
+        ////                    }
+        ////                }
+        ////            }
+        ////        };
+        ////    }
+        ////])
+        ////.directive(cellHeaderTemplateDirective, [
+        ////    () => {
+        ////        return {
+        ////            restrict: 'A',
+        ////            templateUrl: cellHeaderTemplateId,
+        ////            transclude: true,
+        ////            replace: true,
+        ////        };
+        ////    }
+        ////])
         ////.directive(bodyDirective, [
         ////    () => {
         ////        return {
@@ -1231,238 +1471,210 @@ module TrNgGrid{
         ////        };
         ////    }
         ////])
-        .directive(cellBodyDirective, [
-            () => {
-                return {
-                    restrict: 'A',
-                    require: '^' + tableDirective,
-                    scope: true,
-                    compile: (templateElement: JQuery, tAttrs: Object) => {
-                        var isCustomized = tAttrs['isCustomized'] == 'true';
-                        // wrapTemplatedCell(templateElement, tAttrs, isCustomized, cellBodyTemplateDirectiveAttribute);
+        ////    .directive(cellBodyDirective, [
+        ////        () => {
+        ////            return {
+        ////                restrict: 'A',
+        ////                require: '^' + tableDirective,
+        ////                scope: true,
+        ////                compile: (templateElement: JQuery, tAttrs: Object) => {
+        ////                    var isCustomized = tAttrs['isCustomized'] == 'true';
+        ////                    // wrapTemplatedCell(templateElement, tAttrs, isCustomized, cellBodyTemplateDirectiveAttribute);
 
-                        return {
-                            pre: (scope: IGridBodyColumnScope, instanceElement: JQuery, tAttrs: ng.IAttributes, controller: GridController, $transclude: ng.ITranscludeFunction) => {
-                                scope.columnOptions = scope.gridOptions.gridColumnDefs[parseInt(tAttrs[cellBodyDirective])];
-                                scope.gridItem = scope.gridDisplayItem.$$_gridItem;
-                                scope.isCustomized = isCustomized;
+        ////                    return {
+        ////                        pre: (scope: IGridBodyColumnScope, instanceElement: JQuery, tAttrs: ng.IAttributes, controller: GridController, $transclude: ng.ITranscludeFunction) => {
+        ////                            scope.columnOptions = scope.gridOptions.gridColumnDefs[parseInt(tAttrs[cellBodyDirective])];
+        ////                            scope.gridItem = scope.gridDisplayItem.$$_gridItem;
+        ////                            scope.isCustomized = isCustomized;
+        ////                        }
+        ////                    };
+        ////                }
+        ////            };
+        ////        }
+        ////    ])
+        ////    .directive(cellBodyTemplateDirective, [
+        ////        () => {
+        ////            return {
+        ////                restrict: 'A',
+        ////                templateUrl: cellBodyTemplateId,
+        ////                transclude: true,
+        ////                replace: true
+        ////            };
+        ////        }
+        ////    ])
+        ////    .directive(cellFooterDirective, [
+        ////        () => {
+        ////            return {
+        ////                restrict: 'A',
+        ////                require: '^' + tableDirective,
+        ////                scope: true,
+        ////                compile: (templateElement: JQuery, tAttrs: Object) => {
+        ////                    var isCustomized = tAttrs['isCustomized'] == 'true';
+        ////                    // wrapTemplatedCell(templateElement, tAttrs, isCustomized, cellFooterTemplateDirectiveAttribute);
+
+        ////                    return {
+        ////                        pre: (scope: IGridFooterScope, instanceElement: JQuery, tAttrs: ng.IAttributes, controller: GridController, $transclude: ng.ITranscludeFunction) => {
+        ////                            scope.isCustomized = isCustomized;
+        ////                            instanceElement.attr("colspan", scope.gridOptions.gridColumnDefs.length);
+        ////                        }
+        ////                    };
+        ////                }
+        ////            };
+        ////        }
+        ////    ])
+            .directive(globalFilterDirective, [
+                function () {
+                    return {
+                        restrict: 'A',
+                        scope: false,
+                        templateUrl: footerGlobalFilterTemplateId,
+                    };
+                }
+            ])
+            .directive(pagerDirective, [
+                function () {
+                    var setupScope = (scope: IGridFooterScope, controller: GridController) => {
+
+                        // do not set scope.gridOptions.totalItems, it might be set from the outside
+                        scope.totalItemsCount = (typeof (scope.gridOptions.totalItems) != "undefined" && scope.gridOptions.totalItems != null)
+                        ? scope.gridOptions.totalItems
+                        : (scope.gridOptions.items ? scope.gridOptions.items.length : 0);
+
+                        scope.isPaged = (!!scope.gridOptions.pageItems) && (scope.gridOptions.pageItems < scope.totalItemsCount);
+                        scope.extendedControlsActive = false;
+
+                        scope.startItemIndex = scope.isPaged ? (scope.gridOptions.pageItems * scope.gridOptions.currentPage) : 0;
+                        scope.endItemIndex = scope.isPaged ? (scope.startItemIndex + scope.gridOptions.pageItems - 1) : scope.totalItemsCount - 1;
+                        if (scope.endItemIndex >= scope.totalItemsCount) {
+                            scope.endItemIndex = scope.totalItemsCount - 1;
+                        }
+                        if (scope.endItemIndex < scope.startItemIndex) {
+                            scope.endItemIndex = scope.startItemIndex;
+                        }
+                        scope.lastPageIndex = (!scope.totalItemsCount || !scope.isPaged)
+                        ? 0
+                        : (Math.floor(scope.totalItemsCount / scope.gridOptions.pageItems) + ((scope.totalItemsCount % scope.gridOptions.pageItems) ? 0 : -1));
+
+                        scope.pageCanGoBack = scope.isPaged && scope.gridOptions.currentPage > 0;
+                        scope.pageCanGoForward = scope.isPaged && scope.gridOptions.currentPage < scope.lastPageIndex;
+
+                        scope.pageIndexes = scope.pageIndexes || [];
+                        scope.pageIndexes.splice(0);
+                        if (scope.isPaged) {
+                            if (scope.lastPageIndex + 1 > TrNgGrid.defaultPagerMinifiedPageCountThreshold) {
+                                scope.extendedControlsActive = true;
+
+                                var pageIndexHalfRange = Math.floor(TrNgGrid.defaultPagerMinifiedPageCountThreshold/2);
+                                var lowPageIndex = scope.gridOptions.currentPage - pageIndexHalfRange;
+                                var highPageIndex = scope.gridOptions.currentPage + pageIndexHalfRange;
+
+                                // compute the high and low
+                                if (lowPageIndex < 0) {
+                                    highPageIndex += -lowPageIndex;
+                                    lowPageIndex = 0;
+                                }
+                                else if (highPageIndex > scope.lastPageIndex) {
+                                    lowPageIndex -= highPageIndex - scope.lastPageIndex;
+                                    highPageIndex = scope.lastPageIndex;
+                                }
+
+                                // add the extra controls where needed
+                                if (lowPageIndex > 0) {
+                                    scope.pageIndexes.push(null);
+                                    lowPageIndex++;
+                                }
+                                var highPageEllipsed = false;
+                                if (highPageIndex < scope.lastPageIndex) {
+                                    highPageEllipsed = true;
+                                    highPageIndex--;
+                                }
+
+                                for (var pageIndex = lowPageIndex; pageIndex <= highPageIndex; pageIndex++) {
+                                    scope.pageIndexes.push(pageIndex);
+                                }
+
+                                if (highPageEllipsed) {
+                                    scope.pageIndexes.push(null);
+                                }
                             }
-                        };
-                    }
-                };
-            }
-        ])
-        .directive(cellBodyTemplateDirective, [
-            () => {
-                return {
-                    restrict: 'A',
-                    templateUrl: cellBodyTemplateId,
-                    transclude: true,
-                    replace: true
-                };
-            }
-        ])
-        .directive(cellFooterDirective, [
-            () => {
-                return {
-                    restrict: 'A',
-                    require: '^' + tableDirective,
-                    scope: true,
-                    compile: (templateElement: JQuery, tAttrs: Object) => {
-                        var isCustomized = tAttrs['isCustomized'] == 'true';
-                        // wrapTemplatedCell(templateElement, tAttrs, isCustomized, cellFooterTemplateDirectiveAttribute);
-
-                        return {
-                            pre: (scope: IGridFooterScope, instanceElement: JQuery, tAttrs: ng.IAttributes, controller: GridController, $transclude: ng.ITranscludeFunction) => {
-                                scope.isCustomized = isCustomized;
-                                instanceElement.attr("colspan", scope.gridOptions.gridColumnDefs.length);
-                            }
-                        };
-                    }
-                };
-            }
-        ])
-        .directive(cellFooterTemplateDirective, [
-            () => {
-                return {
-                    restrict: 'A',
-                    templateUrl: cellFooterTemplateId,
-                    transclude: true,
-                    replace: true
-                };
-            }
-        ])
-        .directive(columnSortDirective, [
-            function () {
-                return {
-                    restrict: 'A',
-                    replace: true,
-                    templateUrl: columnSortTemplateId
-                };
-            }
-        ])
-        .directive(columnFilterDirective, [
-            function () {
-                return {
-                    restrict: 'A',
-                    replace: true,
-                    templateUrl: columnFilterTemplateId
-                };
-            }
-        ])
-        .directive(globalFilterDirective, [
-            function () {
-                return {
-                    restrict: 'A',
-                    scope: false,
-                    templateUrl: footerGlobalFilterTemplateId,
-                };
-            }
-        ])
-        .directive(pagerDirective, [
-            function () {
-                var setupScope = (scope: IGridFooterScope, controller: GridController) => {
-
-                    // do not set scope.gridOptions.totalItems, it might be set from the outside
-                    scope.totalItemsCount = (typeof (scope.gridOptions.totalItems) != "undefined" && scope.gridOptions.totalItems != null)
-                    ? scope.gridOptions.totalItems
-                    : (scope.gridOptions.items ? scope.gridOptions.items.length : 0);
-
-                    scope.isPaged = (!!scope.gridOptions.pageItems) && (scope.gridOptions.pageItems < scope.totalItemsCount);
-                    scope.extendedControlsActive = false;
-
-                    scope.startItemIndex = scope.isPaged ? (scope.gridOptions.pageItems * scope.gridOptions.currentPage) : 0;
-                    scope.endItemIndex = scope.isPaged ? (scope.startItemIndex + scope.gridOptions.pageItems - 1) : scope.totalItemsCount - 1;
-                    if (scope.endItemIndex >= scope.totalItemsCount) {
-                        scope.endItemIndex = scope.totalItemsCount - 1;
-                    }
-                    if (scope.endItemIndex < scope.startItemIndex) {
-                        scope.endItemIndex = scope.startItemIndex;
-                    }
-                    scope.lastPageIndex = (!scope.totalItemsCount || !scope.isPaged)
-                    ? 0
-                    : (Math.floor(scope.totalItemsCount / scope.gridOptions.pageItems) + ((scope.totalItemsCount % scope.gridOptions.pageItems) ? 0 : -1));
-
-                    scope.pageCanGoBack = scope.isPaged && scope.gridOptions.currentPage > 0;
-                    scope.pageCanGoForward = scope.isPaged && scope.gridOptions.currentPage < scope.lastPageIndex;
-
-                    scope.pageIndexes = scope.pageIndexes || [];
-                    scope.pageIndexes.splice(0);
-                    if (scope.isPaged) {
-                        if (scope.lastPageIndex + 1 > TrNgGrid.defaultPagerMinifiedPageCountThreshold) {
-                            scope.extendedControlsActive = true;
-
-                            var pageIndexHalfRange = Math.floor(TrNgGrid.defaultPagerMinifiedPageCountThreshold/2);
-                            var lowPageIndex = scope.gridOptions.currentPage - pageIndexHalfRange;
-                            var highPageIndex = scope.gridOptions.currentPage + pageIndexHalfRange;
-
-                            // compute the high and low
-                            if (lowPageIndex < 0) {
-                                highPageIndex += -lowPageIndex;
-                                lowPageIndex = 0;
-                            }
-                            else if (highPageIndex > scope.lastPageIndex) {
-                                lowPageIndex -= highPageIndex - scope.lastPageIndex;
-                                highPageIndex = scope.lastPageIndex;
-                            }
-
-                            // add the extra controls where needed
-                            if (lowPageIndex > 0) {
-                                scope.pageIndexes.push(null);
-                                lowPageIndex++;
-                            }
-                            var highPageEllipsed = false;
-                            if (highPageIndex < scope.lastPageIndex) {
-                                highPageEllipsed = true;
-                                highPageIndex--;
-                            }
-
-                            for (var pageIndex = lowPageIndex; pageIndex <= highPageIndex; pageIndex++) {
-                                scope.pageIndexes.push(pageIndex);
-                            }
-
-                            if (highPageEllipsed) {
-                                scope.pageIndexes.push(null);
+                            else {
+                                scope.extendedControlsActive = false;
+                                // we can display all of them
+                                for (var pageIndex = 0; pageIndex <= scope.lastPageIndex; pageIndex++) {
+                                    scope.pageIndexes.push(pageIndex);
+                                }
                             }
                         }
-                        else {
-                            scope.extendedControlsActive = false;
-                            // we can display all of them
-                            for (var pageIndex = 0; pageIndex <= scope.lastPageIndex; pageIndex++) {
-                                scope.pageIndexes.push(pageIndex);
+                        scope.pageSelectionActive = scope.pageIndexes.length > 1;
+
+                        scope.navigateToPage = (pageIndex) => {
+                            scope.gridOptions.currentPage = pageIndex;
+                            scope.speedUpAsyncDataRetrieval();
+                            /*$event.preventDefault();
+                            $event.stopPropagation();*/
+                        }
+
+                        scope.switchPageSelection = ($event, pageSelectionActive) => {
+                            scope.pageSelectionActive = pageSelectionActive;
+                            if ($event) {
+                                $event.preventDefault();
+                                $event.stopPropagation();
                             }
                         }
-                    }
-                    scope.pageSelectionActive = scope.pageIndexes.length > 1;
+                    };
 
-                    scope.navigateToPage = (pageIndex) => {
-                        scope.gridOptions.currentPage = pageIndex;
-                        scope.speedUpAsyncDataRetrieval();
-                        /*$event.preventDefault();
-                        $event.stopPropagation();*/
-                    }
+                    //ng - model = "gridOptions.currentPage" 
 
-                    scope.switchPageSelection = ($event, pageSelectionActive) => {
-                        scope.pageSelectionActive = pageSelectionActive;
-                        if ($event) {
-                            $event.preventDefault();
-                            $event.stopPropagation();
-                        }
-                    }
-                };
-
-                //ng - model = "gridOptions.currentPage" 
-
-                return {
-                    restrict: 'A',
-                    scope: true,
-                    require: '^' + tableDirective,
-                    templateUrl: footerPagerTemplateId,
-                    replace: true,
-                    compile: (templateElement: JQuery, tAttrs: Object) => {
-                        return {
-                            pre: function (scope: IGridFooterScope, compiledInstanceElement: JQuery, tAttrs: ng.IAttributes, controller: GridController) {
-                                setupScope(scope, controller);
-                            },
-                            post: function (scope: IGridFooterScope, instanceElement: JQuery, tAttrs: ng.IAttributes, controller: GridController) {
-                                scope.$watchCollection("[gridOptions.currentPage, gridOptions.items.length, gridOptions.totalItems, gridOptions.pageItems]", (newValues: Array<any>, oldValues: Array<any>) => {
+                    return {
+                        restrict: 'A',
+                        scope: true,
+                        require: '^' + tableDirective,
+                        templateUrl: footerPagerTemplateId,
+                        replace: true,
+                        compile: (templateElement: JQuery, tAttrs: Object) => {
+                            return {
+                                pre: function (scope: IGridFooterScope, compiledInstanceElement: JQuery, tAttrs: ng.IAttributes, controller: GridController) {
                                     setupScope(scope, controller);
-                                });
-                            }
-                        };
-                    }
-                };
-            }
-        ])
-    /*.filter("testFilter", () => {
-        return (input: Array<any>) => {
-            debugger;
-        };
-    })*/
-        .filter(dataPagingFilter, () => {
-            // when server-side logic is enabled, this directive should not be used!
-            return (input: Array<any>, gridOptions: IGridOptions) => {
-                //currentPage?:number, pageItems?:number
-                if (input)
-                    gridOptions.totalItems = input.length;
-
-                if (!gridOptions.pageItems || !input || input.length == 0)
-                    return input;
-
-                if (!gridOptions.currentPage) {
-                    gridOptions.currentPage = 0;
+                                },
+                                post: function (scope: IGridFooterScope, instanceElement: JQuery, tAttrs: ng.IAttributes, controller: GridController) {
+                                    scope.$watchCollection("[gridOptions.currentPage, gridOptions.items.length, gridOptions.totalItems, gridOptions.pageItems]", (newValues: Array<any>, oldValues: Array<any>) => {
+                                        setupScope(scope, controller);
+                                    });
+                                }
+                            };
+                        }
+                    };
                 }
-
-                var startIndex = gridOptions.currentPage * gridOptions.pageItems;
-                if (startIndex >= input.length) {
-                    gridOptions.currentPage = 0;
-                    startIndex = 0;
-                }
-                var endIndex = gridOptions.currentPage * gridOptions.pageItems + gridOptions.pageItems;
-
-                return input.slice(startIndex, endIndex);
+            ])
+        /*.filter("testFilter", () => {
+            return (input: Array<any>) => {
+                debugger;
             };
-        })
+        })*/
+            .filter(dataPagingFilter, () => {
+                // when server-side logic is enabled, this directive should not be used!
+                return (input: Array<any>, gridOptions: IGridOptions) => {
+                    //currentPage?:number, pageItems?:number
+                    if (input)
+                        gridOptions.totalItems = input.length;
+
+                    if (!gridOptions.pageItems || !input || input.length == 0)
+                        return input;
+
+                    if (!gridOptions.currentPage) {
+                        gridOptions.currentPage = 0;
+                    }
+
+                    var startIndex = gridOptions.currentPage * gridOptions.pageItems;
+                    if (startIndex >= input.length) {
+                        gridOptions.currentPage = 0;
+                        startIndex = 0;
+                    }
+                    var endIndex = gridOptions.currentPage * gridOptions.pageItems + gridOptions.pageItems;
+
+                    return input.slice(startIndex, endIndex);
+                };
+            })
         .filter(translateFilter, ["$filter", ($filter: ng.IFilterService) => {
             return (input: any, languageId: string) => {
                 var translatedText: string;
@@ -1534,7 +1746,7 @@ module TrNgGrid{
         // set up default templates
         if (!$templateCache.get(TrNgGrid.cellHeaderTemplateId)) {
             $templateCache.put(TrNgGrid.cellHeaderTemplateId,
-                '<div class="' + TrNgGrid.headerCellCssClass + '" ng-switch="isCustomized">'
+                '<div class="' + TrNgGrid.headerCellCssClass + '" ng-switch="columnOptions.isCustomized">'
                 + '  <div ng-switch-when="true">'
                 + '    <div ng-transclude=""></div>'
                 + '  </div>'
@@ -1550,7 +1762,7 @@ module TrNgGrid{
         }
         if (!$templateCache.get(TrNgGrid.cellBodyTemplateId)) {
             $templateCache.put(TrNgGrid.cellBodyTemplateId,
-                '<div ng-attr-class="' + TrNgGrid.bodyCellCssClass + ' text-{{columnOptions.displayAlign}}" ng-switch="isCustomized">'
+                '<div ng-attr-class="' + TrNgGrid.bodyCellCssClass + ' text-{{columnOptions.displayAlign}}" ng-switch="columnOptions.isCustomized">'
                 + '  <div ng-switch-when="true">'
                 + '    <div ng-transclude=""></div>'
                 + '  </div>'
