@@ -876,6 +876,7 @@ var TrNgGrid;
         // make sure the header is present
         var tableHeaderElement = findChildByTagName(gridElement, "thead");
         if (!tableHeaderElement) {
+            // rubbish angular limitation
             tableHeaderElement = findChildByTagName(angular.element("<table><thead></thead></table>"), "thead");
             gridElement.prepend(tableHeaderElement);
         }
