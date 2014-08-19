@@ -332,6 +332,9 @@ module TrNgGridDemo{
                 .when('/Localization', {
                     templateUrl: 'demo/html/localization.html'
                 })
+                .when('/TestNgRepeat', {
+                    templateUrl: 'demo/html/tests/test_column_defs_ng_repeat.html'
+                })
                 .when('/TestNgSwitch', {
                     templateUrl: 'demo/html/tests/test_ng_switch.html'
                 })

@@ -1,0 +1,29 @@
+﻿<div ng-controller="TrNgGridDemo.TestController" ng-init="generateItems(20)">
+    <div class="panel panel-primary">
+        <div class="panel-heading">
+            Using complex column definition (ng-repeat)
+        </div>
+        <div class="panel-body">
+            <div class="row">
+                <div class="col-md-5">
+                    <p>
+                        This is a test for checking whether complex column definitions work.
+                    </p>
+                    <pre id="trNgGrid_items_update_bug">
+                        </pre>
+                </div>
+                <div class="col-md-7" project-markup-to="#trNgGrid_items_update_bug" ng-init="fields=['id', 'name']">
+                    {{fields}}
+                    <table tr-ng-grid items="myItems">
+                        <thead>
+                            <tr>
+                                <th ng-repeat="field in fields"></th>
+                            </tr>
+                        </thead>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
