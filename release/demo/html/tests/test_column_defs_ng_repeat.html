@@ -17,7 +17,7 @@
                     <table tr-ng-grid items="myItems">
                         <thead>
                             <tr>
-                                <th ng-repeat="field in fields"></th>
+                                <th ng-repeat="field in fields" ng-attr-field-name="{{field}}"></th>
                             </tr>
                         </thead>
                     </table>

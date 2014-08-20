@@ -66,9 +66,8 @@ var TrNgGrid;
     var cellHeaderTemplateDirective = "trNgGridHeaderCellTemplate";
     var cellHeaderTemplateDirectiveAttribute = "tr-ng-grid-header-cell-template";
 
-    var cellHeaderSourceTemplateDirective = "trNgGridHeaderCellSource";
-    var cellHeaderSourceTemplateDirectiveAttribute = "tr-ng-grid-header-cell-source";
-
+    //var cellHeaderSourceTemplateDirective = "trNgGridHeaderCellSource";
+    //var cellHeaderSourceTemplateDirectiveAttribute = "tr-ng-grid-header-cell-source";
     TrNgGrid.cellHeaderTemplateId = cellHeaderTemplateDirective + ".html";
 
     var cellBodyDirective = "trNgGridBodyCell";
@@ -77,9 +76,8 @@ var TrNgGrid;
     var cellBodyTemplateDirectiveAttribute = "tr-ng-grid-body-cell-template";
     TrNgGrid.cellBodyTemplateId = cellBodyTemplateDirective + ".html";
 
-    var cellBodySourceTemplateDirective = "trNgGridBodyCellSource";
-    var cellBodySourceTemplateDirectiveAttribute = "tr-ng-grid-body-cell-source";
-
+    //var cellBodySourceTemplateDirective = "trNgGridBodyCellSource";
+    //var cellBodySourceTemplateDirectiveAttribute = "tr-ng-grid-body-cell-source";
     var columnSortDirective = "trNgGridColumnSort";
     TrNgGrid.columnSortDirectiveAttribute = "tr-ng-grid-column-sort";
     TrNgGrid.columnSortTemplateId = columnSortDirective + ".html";
@@ -870,19 +868,53 @@ var TrNgGrid;
         console.log(tableDirective + "(" + new Date().getTime() + "): " + message);
     };
 
+    var fixTableSectionRowStructure = function (sectionElement, sectionRowDecoratorFct) {
+        // make sure the row element is present
+        var sectionElementTag = sectionElement.prop("tagName");
+        var sectionRowElement = findChildByTagName(sectionElement, "tr");
+        if (!sectionRowElement) {
+            // work around an angular limitation
+            sectionRowElement = findChildByTagName(findChildByTagName(angular.element("<table><" + sectionElementTag + "><tr></tr></" + sectionElementTag + "></table>"), sectionElementTag), "tr");
+            sectionElement.append(sectionRowElement);
+        }
+
+        if (sectionRowDecoratorFct) {
+            var sectionRowElements = findChildrenByTagName(sectionElement, "tr");
+            angular.forEach(sectionRowElements, function (sectionRowElement, index) {
+                sectionRowDecoratorFct(sectionRowElement, index === 0, index === sectionRowElements.length - 1);
+            });
+        }
+    };
+
+    var fixTableSectionStructure = function (gridElement, sectionTag, tableSectionDecoratorFct) {
+        // make sure the section element is present
+        var tableSectionElement = findChildByTagName(gridElement, sectionTag);
+        if (!tableSectionElement) {
+            // work around an angular limitation
+            tableSectionElement = findChildByTagName(angular.element("<table><" + sectionTag + "></" + sectionTag + "></table>"), sectionTag);
+            gridElement.prepend(tableSectionElement);
+        }
+
+        if (tableSectionDecoratorFct) {
+            tableSectionDecoratorFct(tableSectionElement);
+        }
+    };
+
     var fixTableStructure = function (gridElement, allowDataBindings) {
         gridElement.addClass(TrNgGrid.tableCssClass);
 
-        // make sure the header is present
-        var tableHeaderElement = findChildByTagName(gridElement, "thead");
-        if (!tableHeaderElement) {
-            // rubbish angular limitation
-            tableHeaderElement = findChildByTagName(angular.element("<table><thead></thead></table>"), "thead");
-            gridElement.prepend(tableHeaderElement);
-        }
+        // deal with the header
+        fixTableSectionStructure(gridElement, "thead", function (sectionElement) {
+            sectionElement.attr(headerDirectiveAttribute, "");
+            fixTableSectionRowStructure(sectionElement, function (rowElement, isFirst, isLast) {
+                if (isFirst) {
+                }
+            });
+        });
+
         var tableHeaderRowElement = findChildByTagName(tableHeaderElement, "tr");
         if (!tableHeaderRowElement) {
-            tableHeaderRowElement = findChildByTagName(angular.element("<table><thead><tr></tr><thead></table>"), "tr");
+            tableHeaderRowElement = findChildByTagName(findChildByTagName(angular.element("<table><thead><tr></tr></thead></table>"), "thead"), "tr");
             tableHeaderElement.append(tableHeaderRowElement);
         }
         tableHeaderElement.attr(headerDirectiveAttribute, "");
@@ -901,24 +933,28 @@ var TrNgGrid;
             tableBodyElement = findChildByTagName(angular.element("<table><tbody></tbody></table>"), "tbody");
             tableFooterElement.after(tableBodyElement);
         }
-        debugger;
+
         var tableBodyRowElement = findChildByTagName(tableBodyElement, "tr");
         if (!tableBodyRowElement) {
-            tableBodyRowElement = findChildByTagName(angular.element("<table><tr></tr></table>"), "tr");
+            tableBodyRowElement = findChildByTagName(findChildByTagName(angular.element("<table><tbody><tr></tr></tbody></table>"), "tbody"), "tr");
             tableBodyElement.append(tableBodyRowElement);
         }
         tableBodyElement.attr(bodyDirectiveAttribute, "");
 
-        debugger;
+        // any other elements are not allowed
+        ////angular.forEach(gridElement.children, (element: HTMLElement) => {
+        ////    if (element !== tableHeaderElement[0] || element !== tableBodyElement[0] || element !== tableFooterElement[0]) {
+        ////        angular.element(element).remove();
+        ////        debugMode && log("Invalid extra element found inside the grid template structure: " + element.tagName);
+        ////    }
+        ////});
         angular.forEach(findChildrenByTagName(tableHeaderRowElement, "th"), function (element) {
-            angular.element(element).attr(cellHeaderSourceTemplateDirectiveAttribute, "");
+            angular.element(element).attr(cellHeaderDirectiveAttribute, "");
         });
 
         angular.forEach(findChildrenByTagName(tableBodyRowElement, "td"), function (element) {
-            angular.element(element).attr(cellBodySourceTemplateDirectiveAttribute, "");
+            angular.element(element).attr(cellBodyDirectiveAttribute, "");
         });
-
-        debugger;
 
         // block or allow data bindings
         if (allowDataBindings) {
@@ -998,37 +1034,20 @@ var TrNgGrid;
                     };
                 }
             };
-        }]).directive(headerDirective, [
-        function () {
-            return {
-                restrict: 'A',
-                require: '^' + tableDirective,
-                template: '<thead>' + '  <tr>' + '    <th ng-repeat="columnOptions in gridOptions.gridColumnDefs" ' + cellHeaderDirectiveAttribute + ' = "">' + '      <div ' + cellHeaderTemplateDirectiveAttribute + ' = ""></div>' + '    </th>' + '  </tr> ' + '</thead> ',
-                transclude: true,
-                link: function (gridScope, instanceElement, tAttrs, controller, transcludeFn) {
-                    debugger;
-                    transcludeFn(gridScope, function (clonedElement, gridScope) {
-                        console.log(instanceElement);
-                        console.log(clonedElement);
-                        debugger;
-                    });
-                }
-            };
-        }
-    ]).directive(cellHeaderSourceTemplateDirective, [
+        }]).directive(cellHeaderDirective, [
         function () {
             return {
                 restrict: 'A',
                 scope: {
-                    fieldName: '=?',
-                    displayName: '=?',
-                    displayAlign: '=?',
-                    displayFormat: '=?',
+                    fieldName: '@',
+                    displayName: '@',
+                    displayAlign: '@',
+                    displayFormat: '@',
                     enableSorting: '=?',
                     enableFiltering: '=?',
-                    cellWidth: '=?',
-                    cellHeight: '=?',
-                    filter: '=?'
+                    cellWidth: '@',
+                    cellHeight: '@',
+                    filter: '@'
                 },
                 require: '^' + tableDirective,
                 transclude: true,
@@ -1038,33 +1057,24 @@ var TrNgGrid;
                             debugger;
 
                             // all we need to do here is to grab the settings and register them
+                            //isolatedScope.template = angular.element(instanceElement.clone(true, true));
                             controller.setupColumn(isolatedScope.fieldName, isolatedScope);
+                        },
+                        post: function (isolatedScope, instanceElement, tAttrs, controller, transcludeFn) {
+                            var instanceElementChildren = instanceElement.children();
+                            instanceElement.empty();
+
+                            var cellContainerElement = angular.element("<div></div>");
+                            cellContainerElement.attr(cellHeaderTemplateDirectiveAttribute, "");
+                            cellContainerElement.append(instanceElementChildren);
+
+                            instanceElement.append(cellContainerElement);
+
+                            transcludeFn(isolatedScope.$parent, function (clonedElement, scope) {
+                                instanceElement.replaceWith(clonedElement);
+                            });
                         }
                     };
-                }
-            };
-        }
-    ]).directive(cellHeaderDirective, [
-        "$compile",
-        function ($compile) {
-            return {
-                restrict: 'A',
-                scope: {
-                    displayName: '&',
-                    displayAlign: '&',
-                    displayFormat: '&',
-                    enableSorting: '&',
-                    enableFiltering: '&',
-                    cellWidth: '&',
-                    cellHeight: '&',
-                    filter: '&'
-                },
-                require: '^' + tableDirective,
-                transclude: true,
-                link: function (isolatedScope, instanceElement, tAttrs, controller, transcludeFn) {
-                    transcludeFn(isolatedScope.$parent, function (clonedElement, gridColumnScope) {
-                        instanceElement.append(clonedElement);
-                    });
                 }
             };
         }
@@ -1096,7 +1106,6 @@ var TrNgGrid;
                 templateUrl: TrNgGrid.cellHeaderTemplateId,
                 replace: true,
                 scope: true,
-                //replace: true,
                 link: function (gridColumnScope, instanceElement, tAttrs, controller, transcludeFn) {
                     gridColumnScope.toggleSorting = function (propertyName) {
                         controller.toggleSorting(propertyName);
