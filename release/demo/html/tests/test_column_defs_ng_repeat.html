@@ -12,12 +12,12 @@
                     <pre id="trNgGrid_items_update_bug">
                         </pre>
                 </div>
-                <div class="col-md-7" project-markup-to="#trNgGrid_items_update_bug" ng-init="fields=['id', 'name']">
+                <div class="col-md-7" data-project-markup-to="#trNgGrid_items_update_bug" ng-init="fields=['id', 'name']">
                     {{fields}}
-                    <table tr-ng-grid items="myItems">
+                    <table data-tr-ng-grid="" data-items="myItems">
                         <thead>
                             <tr>
-                                <th ng-repeat="field in fields" ng-attr-field-name="{{field}}"></th>
+                                <th ng-repeat="field in fields" data-field-name="{{field}}"></th>
                             </tr>
                         </thead>
                     </table>
