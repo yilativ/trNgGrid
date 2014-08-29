@@ -298,6 +298,20 @@ var TrNgGrid;
             this.gridOptions.filterByFields = angular.extend({}, this.gridOptions.filterByFields);
         };
 
+        GridController.prototype.validateColumnDefinitions = function (gridScope) {
+            gridScope.displayedGridColumnDefs = [];
+
+            for (var columnDefIndex = 0; columnDefIndex < this.gridOptions.gridColumnDefs.length; columnDefIndex++) {
+                var columnDef = this.gridOptions.gridColumnDefs[columnDefIndex];
+                if (columnDef.fieldName) {
+                    // a field name was set, check against the fields, if set
+                } else {
+                    // a custom field, always add it
+                    gridScope.displayedGridColumnDefs.push(columnDef);
+                }
+            }
+        };
+
         GridController.prototype.initializeColumnDefinitions = function (gridScope) {
             var _this = this;
             if (this.columnDefsFieldsWatcherDeregistrationFct) {
