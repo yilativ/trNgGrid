@@ -515,7 +515,17 @@ module TrNgGrid{
                     this.columnDefsFieldsWatcherDeregistrationFct = null;
                 }
 
-                gridScope.displayedGridColumnDefs = newGridColumnDefs;
+                gridScope.displayedGridColumnDefs.splice(0);
+                if (newGridColumnDefs) {
+                    debugger;
+                    angular.forEach(newGridColumnDefs, (gridColumnDefinition: IGridColumnDefinition) => {
+                        for (var sourceType in gridColumnDefinition.definitionSource) {
+                            // any active source will cause the grid def to be used
+                            gridScope.displayedGridColumnDefs.push(gridColumnDefinition);
+                            break;
+                        }
+                    });
+                }
             });
         }
 
@@ -552,6 +562,18 @@ module TrNgGrid{
             }
 
             return columnDefOptions;
+        }
+
+        unregisterColumn(fieldName: string, sourceType: ColumnDefinitionSource) {
+            // find the column definition first
+            var columnDefOptions: IGridColumnDefinition;
+            var columnDefIndex: number;
+            for (columnDefIndex = 0; columnDefIndex < this.gridOptions.gridColumnDefs.length && this.gridOptions.gridColumnDefs[columnDefIndex].fieldName !== fieldName; columnDefIndex++);
+            if (columnDefIndex < this.gridOptions.gridColumnDefs.length) {
+                columnDefOptions = this.gridOptions.gridColumnDefs[columnDefIndex];
+                delete columnDefOptions.definitionSource[sourceType];
+                delete columnDefOptions.isCustomized[sourceType];
+            }
         }
 
         ////setupColumn(fieldName:string, sourceType:ColumnDefinitionSource, isCustomized:boolean, gridOptions?: IGridColumnOptions) {
@@ -1159,6 +1181,11 @@ module TrNgGrid{
                                 instanceElement.remove();
                                 columnDefinition.ephemeralPlaceholder.empty();
                                 columnDefinition.ephemeralPlaceholder.append(transcludedElement);
+                            });
+
+                            isolatedScope.$on("destroy", () => {
+                                debugger;
+                                controller.unregisterColumn(fieldName, ColumnDefinitionSource.Header);
                             });
                         };
                     }

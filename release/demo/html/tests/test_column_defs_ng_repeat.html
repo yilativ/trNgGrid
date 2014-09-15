@@ -12,12 +12,17 @@
                     <pre id="trNgGrid_items_update_bug">
                         </pre>
                 </div>
-                <div class="col-md-7" data-project-markup-to="#trNgGrid_items_update_bug" ng-init="fields=['id', 'name']">
-                    {{fields}}
+                <div class="col-md-7" data-project-markup-to="#trNgGrid_items_update_bug" ng-init="myNgRepeatFields=['id', 'name']">
+                    <div>
+                        <span class="checkbox" ng-repeat="fieldName in ['id', 'name']">
+                            <input type="checkbox" ng-model="myNgRepeatFields[$index]" ng-true-value="{{fieldName}}" ng-false-value="" />
+                            {{fieldName}}
+                        </span>
+                    </div>
                     <table data-tr-ng-grid="" data-items="myItems">
                         <thead>
                             <tr>
-                                <th ng-repeat="field in fields" data-field-name="{{field}}"></th>
+                                <th data-ng-repeat="field in myNgRepeatFields" data-field-name="{{field}}" data-ng-if="field"></th>
                             </tr>
                         </thead>
                     </table>

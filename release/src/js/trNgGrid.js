@@ -340,7 +340,17 @@ var TrNgGrid;
                     _this.columnDefsFieldsWatcherDeregistrationFct = null;
                 }
 
-                gridScope.displayedGridColumnDefs = newGridColumnDefs;
+                gridScope.displayedGridColumnDefs.splice(0);
+                if (newGridColumnDefs) {
+                    debugger;
+                    angular.forEach(newGridColumnDefs, function (gridColumnDefinition) {
+                        for (var sourceType in gridColumnDefinition.definitionSource) {
+                            // any active source will cause the grid def to be used
+                            gridScope.displayedGridColumnDefs.push(gridColumnDefinition);
+                            break;
+                        }
+                    });
+                }
             });
         };
 
@@ -378,6 +388,19 @@ var TrNgGrid;
             }
 
             return columnDefOptions;
+        };
+
+        GridController.prototype.unregisterColumn = function (fieldName, sourceType) {
+            // find the column definition first
+            var columnDefOptions;
+            var columnDefIndex;
+            for (columnDefIndex = 0; columnDefIndex < this.gridOptions.gridColumnDefs.length && this.gridOptions.gridColumnDefs[columnDefIndex].fieldName !== fieldName; columnDefIndex++)
+                ;
+            if (columnDefIndex < this.gridOptions.gridColumnDefs.length) {
+                columnDefOptions = this.gridOptions.gridColumnDefs[columnDefIndex];
+                delete columnDefOptions.definitionSource[sourceType];
+                delete columnDefOptions.isCustomized[sourceType];
+            }
         };
 
         ////setupColumn(fieldName:string, sourceType:ColumnDefinitionSource, isCustomized:boolean, gridOptions?: IGridColumnOptions) {
@@ -926,6 +949,11 @@ var TrNgGrid;
                             instanceElement.remove();
                             columnDefinition.ephemeralPlaceholder.empty();
                             columnDefinition.ephemeralPlaceholder.append(transcludedElement);
+                        });
+
+                        isolatedScope.$on("destroy", function () {
+                            debugger;
+                            controller.unregisterColumn(fieldName, 0 /* Header */);
                         });
                     };
                 }

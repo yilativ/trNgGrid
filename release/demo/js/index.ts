@@ -1,5 +1,5 @@
-﻿/// <reference path="../../src/external/typings/jquery/jquery.d.ts" />
-/// <reference path="../../src/external/typings/angularjs/angular.d.ts" />
+﻿/// <reference path="../../src/external/typings/angularjs/angular.d.ts" />
+/// <reference path="../../src/external/typings/angularjs/angular-route.d.ts" />
 
 module TrNgGridDemo{
     declare var prettyPrintOne: (unformattedText:string, language?:string, generateLineNumbers?:boolean) => string;
@@ -32,7 +32,7 @@ module TrNgGridDemo{
         alert: (message: string) => void;
         alertOnSelectionChange: () => void;
         addNew: () => void;
-        onServerSideItemsRequested: (currentPage: number, filterBy: string, filterByFields: Object, orderBy: string, orderByReverse: boolean) => void;
+        onServerSideItemsRequested: (currentPage: number, pageItems:number, filterBy: string, filterByFields: Object, orderBy: string, orderByReverse: boolean) => void;
         generateItems: (pageItems: number, totalItems?: number, generateComplexItems?:boolean) => void;
         addDateToItems: () => void;
         showMessage: (event: ng.IAngularEvent, msg: string) => void;
@@ -140,12 +140,13 @@ module TrNgGridDemo{
             $scope.addDateToItems = () => { this.addDateToItems(); };
 
             var prevServerItemsRequestedCallbackPromise:ng.IPromise<any>;
-            $scope.onServerSideItemsRequested = (currentPage:number, filterBy:string, filterByFields:Object, orderBy:string, orderByReverse:boolean)=>{
+            $scope.onServerSideItemsRequested = (currentPage:number, pageItems:number, filterBy:string, filterByFields:Object, orderBy:string, orderByReverse:boolean)=>{
                 if(prevServerItemsRequestedCallbackPromise){
                     $timeout.cancel(prevServerItemsRequestedCallbackPromise);
                     prevServerItemsRequestedCallbackPromise = null;
                 }
                 $scope.requestedItemsGridOptions = {
+                    pageItems:pageItems,
                     currentPage:currentPage,
                     filterBy:filterBy,
                     filterByFields: angular.toJson(filterByFields),
@@ -154,7 +155,7 @@ module TrNgGridDemo{
                     requestTrapped:true
                 };
 
-                $scope.generateItems(10,100, true);
+                $scope.generateItems(pageItems,100, true);
                 prevServerItemsRequestedCallbackPromise = $timeout(()=>{
                     $scope.requestedItemsGridOptions["requestTrapped"] = false;
                     prevServerItemsRequestedCallbackPromise = null;
@@ -301,13 +302,12 @@ module TrNgGridDemo{
 
     // https://github.com/ocombe/ocLazyLoad
     angular.module("trNgGridDemo", ["ngRoute", "trNgGrid", "ui.bootstrap", "oc.lazyLoad"])
-        .config(["$routeProvider", "$locationProvider", ($routeProvider: any, $locationProvider: any) => {
-            // html5 is not working
-            //$locationProvider
-            //    .html5Mode(true)
-            //    .hashPrefix('!');
-
-            $routeProvider
+        .config(["$routeProvider", "$locationProvider", ($route: ng.route.IRouteProvider, $location: ng.ILocationProvider) => {
+            // html5 is not working without server-side changes
+            //$location
+            //    .hashPrefix('!')
+            //    .html5Mode(true);
+            $route
                 .when('/Common', {
                     templateUrl: 'demo/html/common.html'
                 })
@@ -437,6 +437,11 @@ module TrNgGridDemo{
             var deChTranslation = angular.extend({}, deTranslation);
             deChTranslation[TrNgGrid.translationDateFormat] = "dd.MM.yyyy";
             TrNgGrid.translations["de-ch"] = deChTranslation;
+        })
+        .filter("testComputedField", function () {
+            return function (combinedFieldValueUnused: any, item: any) {
+                return item.id + " / " + item.name;
+            };
         });
         //.directive("fixedHeaderFooter", [
         //    () => {

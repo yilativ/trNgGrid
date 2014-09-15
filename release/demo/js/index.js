@@ -1,5 +1,5 @@
-﻿/// <reference path="../../src/external/typings/jquery/jquery.d.ts" />
-/// <reference path="../../src/external/typings/angularjs/angular.d.ts" />
+﻿/// <reference path="../../src/external/typings/angularjs/angular.d.ts" />
+/// <reference path="../../src/external/typings/angularjs/angular-route.d.ts" />
 var TrNgGridDemo;
 (function (TrNgGridDemo) {
     (function (RndGenOptions) {
@@ -110,12 +110,13 @@ var TrNgGridDemo;
             };
 
             var prevServerItemsRequestedCallbackPromise;
-            $scope.onServerSideItemsRequested = function (currentPage, filterBy, filterByFields, orderBy, orderByReverse) {
+            $scope.onServerSideItemsRequested = function (currentPage, pageItems, filterBy, filterByFields, orderBy, orderByReverse) {
                 if (prevServerItemsRequestedCallbackPromise) {
                     $timeout.cancel(prevServerItemsRequestedCallbackPromise);
                     prevServerItemsRequestedCallbackPromise = null;
                 }
                 $scope.requestedItemsGridOptions = {
+                    pageItems: pageItems,
                     currentPage: currentPage,
                     filterBy: filterBy,
                     filterByFields: angular.toJson(filterByFields),
@@ -124,7 +125,7 @@ var TrNgGridDemo;
                     requestTrapped: true
                 };
 
-                $scope.generateItems(10, 100, true);
+                $scope.generateItems(pageItems, 100, true);
                 prevServerItemsRequestedCallbackPromise = $timeout(function () {
                     $scope.requestedItemsGridOptions["requestTrapped"] = false;
                     prevServerItemsRequestedCallbackPromise = null;
@@ -258,12 +259,12 @@ var TrNgGridDemo;
 
     // https://github.com/ocombe/ocLazyLoad
     angular.module("trNgGridDemo", ["ngRoute", "trNgGrid", "ui.bootstrap", "oc.lazyLoad"]).config([
-        "$routeProvider", "$locationProvider", function ($routeProvider, $locationProvider) {
-            // html5 is not working
-            //$locationProvider
-            //    .html5Mode(true)
-            //    .hashPrefix('!');
-            $routeProvider.when('/Common', {
+        "$routeProvider", "$locationProvider", function ($route, $location) {
+            // html5 is not working without server-side changes
+            //$location
+            //    .hashPrefix('!')
+            //    .html5Mode(true);
+            $route.when('/Common', {
                 templateUrl: 'demo/html/common.html'
             }).when('/Columns', {
                 templateUrl: 'demo/html/columns.html'
@@ -365,6 +366,10 @@ var TrNgGridDemo;
         var deChTranslation = angular.extend({}, deTranslation);
         deChTranslation[TrNgGrid.translationDateFormat] = "dd.MM.yyyy";
         TrNgGrid.translations["de-ch"] = deChTranslation;
+    }).filter("testComputedField", function () {
+        return function (combinedFieldValueUnused, item) {
+            return item.id + " / " + item.name;
+        };
     });
 })(TrNgGridDemo || (TrNgGridDemo = {}));
 //# sourceMappingURL=index.js.map
