@@ -298,7 +298,7 @@ var TrNgGrid;
         GridController.prototype.setupScope = function ($isolatedScope, $gridElement, $attrs) {
             var _this = this;
             // create a scope, used just by our grid
-            var gridScope = $isolatedScope.$new();
+            var gridScope = $isolatedScope.$parent.$new();
 
             // initialise the options
             this.gridOptions = {

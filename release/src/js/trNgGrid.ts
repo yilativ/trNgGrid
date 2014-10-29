@@ -454,7 +454,7 @@ module TrNgGrid{
 
         public setupScope($isolatedScope: ng.IScope, $gridElement: JQuery, $attrs: ng.IAttributes): IGridScope{
             // create a scope, used just by our grid
-            var gridScope:IGridScope = <IGridScope>$isolatedScope.$new();
+            var gridScope:IGridScope = <IGridScope>$isolatedScope.$parent.$new();
 
             // initialise the options
             this.gridOptions = <IGridOptions>{
