@@ -881,7 +881,9 @@ module TrNgGrid{
                 }
             }
             debugMode && this.log("filtering items of length " + (scope.formattedItems ? scope.formattedItems.length : 0));
-            scope.filteredItems = scope.$eval("formattedItems | filter:gridOptions.filterBy | filter:filterByDisplayFields | orderBy:orderByValueExtractor(gridOptions.orderBy):gridOptions.orderByReverse | " + dataPagingFilter + ":gridOptions");
+            scope.filteredItems = scope.$eval("formattedItems | filter:gridOptions.filterBy | filter:filterByDisplayFields | orderBy:orderByValueExtractor(gridOptions.orderBy):gridOptions.orderByReverse | "
+            + dataPagingFilter + ":gridOptions");
+
         }
 
         setupDisplayItemsArray(scope: IGridScope) {
@@ -1063,8 +1065,9 @@ module TrNgGrid{
                                     for (var columnOptionsIndex = 0; (columnOptionsIndex < gridScope.gridOptions.gridColumnDefs.length) && ((columnOptions = gridScope.gridOptions.gridColumnDefs[columnOptionsIndex]).fieldName !== fieldName); columnOptions = null, columnOptionsIndex++);
 
                                     return (item: any) => {
-                                        if (!columnOptions) {
-                                            return undefined;
+                                        if (!columnOptions && fieldName && item && item.$$_gridItem) {
+                                            // maybe a hidden column, so let's just return it
+                                            return item.$$_gridItem[fieldName];
                                         }
 
                                         var fieldValue: any = undefined;

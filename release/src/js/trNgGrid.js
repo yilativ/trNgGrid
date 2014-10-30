@@ -890,8 +890,9 @@ var TrNgGrid;
                                     ;
 
                                 return function (item) {
-                                    if (!columnOptions) {
-                                        return undefined;
+                                    if (!columnOptions && fieldName && item && item.$$_gridItem) {
+                                        // maybe a hidden column, so let's just return it
+                                        return item.$$_gridItem[fieldName];
                                     }
 
                                     var fieldValue = undefined;
